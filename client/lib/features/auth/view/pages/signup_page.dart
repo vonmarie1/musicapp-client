@@ -1,4 +1,6 @@
 // import 'package:client/features/auth/repositories/auth_remote_repository.dart';
+import 'package:client/core/widgets/loader.dart';
+import 'package:client/features/auth/view/pages/login_page.dart';
 import 'package:client/features/auth/view/widgets/auth_gradient_button.dart';
 import 'package:client/features/auth/view/widgets/custom_field.dart';
 import 'package:client/features/auth/viewmodel/auth_viewmodel.dart';
@@ -27,54 +29,92 @@ class _SignupPageState extends ConsumerState<SignupPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = ref.watch(authViewModelProvider)?.isLoading == true;
+    ref.listen(
+      authViewModelProvider,
+      (_, next) {
+        next?.when(
+          data: (data) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text('Account created! Please login'),
+                ),
+              );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const LoginPage(),
+              ),
+            );
+          },
+          error: (error, st) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(error.toString()),
+                ),
+              );
+          },
+          loading: () {},
+        );
+      },
+    );
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Sign Up.',
-                style: TextStyle(
-                  fontSize: 50,
-                  fontWeight: FontWeight.bold,
+      appBar: AppBar(),
+      body: isLoading
+          ? const Loader()
+          : Padding(
+              padding: const EdgeInsets.all(15.0),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'Sign Up.',
+                      style: TextStyle(
+                        fontSize: 50,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 50),
+                    CustomField(
+                      hintText: 'Name',
+                      controller: nameController,
+                    ),
+                    const SizedBox(height: 30),
+                    CustomField(
+                      hintText: 'Email',
+                      controller: emailController,
+                    ),
+                    const SizedBox(height: 30),
+                    CustomField(
+                      hintText: 'Password',
+                      controller: passwordController,
+                      prefixIcon: Icons.lock,
+                      isPassword: true,
+                    ),
+                    const SizedBox(height: 30),
+                    AuthGradientButton(
+                      buttonText: 'Sign Up',
+                      onTap: () async {
+                        if (formKey.currentState!.validate()) {
+                          await ref
+                              .read(authViewModelProvider.notifier)
+                              .signUpUser(
+                                  name: nameController.text,
+                                  email: emailController.text,
+                                  password: passwordController.text);
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 50),
-              CustomField(
-                hintText: 'Name',
-                controller: nameController,
-              ),
-              const SizedBox(height: 30),
-              CustomField(
-                hintText: 'Email',
-                controller: emailController,
-              ),
-              const SizedBox(height: 30),
-              CustomField(
-                hintText: 'Password',
-                controller: passwordController,
-                prefixIcon: Icons.lock,
-                isPassword: true,
-              ),
-              const SizedBox(height: 30),
-              AuthGradientButton(
-                buttonText: 'Sign Up',
-                onTap: () async {
-                  if (formKey.currentState!.validate()) {
-                    await ref.read(authViewModelProvider.notifier).signUpUser(
-                        name: nameController.text,
-                        email: emailController.text,
-                        password: passwordController.text);
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

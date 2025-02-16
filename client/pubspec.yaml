@@ -38,6 +38,12 @@ dependencies:
   fpdart: ^2.0.0-dev.3
   flutter_riverpod: ^2.6.1
   riverpod_annotation: ^2.6.1
+  provider: ^6.1.2
+  email_otp: ^3.0.2
+  supabase_flutter: ^2.8.3
+  firebase_admin: ^0.3.0+1
+  firebase_core: ^3.11.0
+  firebase_auth: ^5.4.2
 
 dev_dependencies:
   flutter_test:

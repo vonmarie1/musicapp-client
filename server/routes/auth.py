@@ -7,6 +7,7 @@ from schmas.usercreate import UserCreate
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
 from schmas.login import UserLogin
+import jwt
 router = APIRouter()
 
 @router.post('/signup', status_code=201)
@@ -38,6 +39,8 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
 
       if not is_match:
             raise HTTPException(400, 'Incorrect password')
+
+      token = jwt.encode({'id': user_db.id}, 'password_key')
       
-      return user_db
+      return {'token': token, 'user': user_db}
       
