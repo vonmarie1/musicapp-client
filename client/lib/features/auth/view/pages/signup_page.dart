@@ -1,5 +1,5 @@
 import 'package:client/core/widgets/loader.dart';
-import 'package:client/features/auth/view/pages/otp_page.dart';
+import 'package:client/features/auth/view/pages/login_page.dart';
 import 'package:client/features/auth/view/widgets/auth_gradient_button.dart';
 import 'package:client/features/auth/view/widgets/custom_field.dart';
 import 'package:client/features/auth/viewmodel/auth_viewmodel.dart';
@@ -38,13 +38,13 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 const SnackBar(
-                  content: Text('An OTP has been sent to your email!'),
+                  content: Text('Account created'),
                 ),
               );
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => OTPPage(email: emailController.text),
+                builder: (context) => LoginPage(),
               ),
             );
           },
