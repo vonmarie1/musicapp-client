@@ -17,7 +17,6 @@ class CustomField extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
   _CustomFieldState createState() => _CustomFieldState();
 }
 
@@ -30,6 +29,28 @@ class _CustomFieldState extends State<CustomField> {
     _obscureText = widget.isPassword;
   }
 
+  String? _validateInput(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "${widget.hintText} is required!";
+    }
+
+    if (widget.keyboardType == TextInputType.emailAddress) {
+      final emailRegex =
+          RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+      if (!emailRegex.hasMatch(value)) {
+        return 'Enter a valid email address';
+      }
+    }
+    if (widget.isPassword) {
+      final passwordRegex = RegExp(
+          r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@\$!%*?&])[A-Za-z\d@\$!%*?&]{8,}$');
+      if (!passwordRegex.hasMatch(value)) {
+        return 'Password must be at least 8 characters, include an uppercase letter, a lowercase letter, a number, and a special character.';
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return TextFormField(
@@ -40,6 +61,8 @@ class _CustomFieldState extends State<CustomField> {
         prefixIcon: widget.prefixIcon != null ? Icon(widget.prefixIcon) : null,
         labelText: widget.hintText,
         hintText: widget.hintText,
+        border: OutlineInputBorder(),
+        errorMaxLines: 3,
         suffixIcon: widget.isPassword
             ? IconButton(
                 onPressed: () {
@@ -53,12 +76,7 @@ class _CustomFieldState extends State<CustomField> {
               )
             : null,
       ),
-      validator: (val) {
-        if (val!.trim().isEmpty) {
-          return " hintText is missing!";
-        }
-        return null;
-      },
+      validator: _validateInput,
     );
   }
 }
