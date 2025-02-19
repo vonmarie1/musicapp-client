@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pin_code_fields/pin_code_fields.dart';
 
 class CustomField extends StatefulWidget {
   final String hintText;
   final TextEditingController controller;
   final IconData? prefixIcon;
   final bool isPassword;
+  final bool isOtp;
   final TextInputType keyboardType;
 
   const CustomField({
@@ -13,6 +15,7 @@ class CustomField extends StatefulWidget {
     required this.controller,
     this.prefixIcon,
     this.isPassword = false,
+    this.isOtp = false,
     this.keyboardType = TextInputType.text,
   });
 
@@ -41,18 +44,44 @@ class _CustomFieldState extends State<CustomField> {
         return 'Enter a valid email address';
       }
     }
+
     if (widget.isPassword) {
       final passwordRegex = RegExp(
           r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@\$!%*?&])[A-Za-z\d@\$!%*?&]{8,}$');
       if (!passwordRegex.hasMatch(value)) {
-        return 'Password must be at least 8 characters, include an uppercase letter, a lowercase letter, a number, and a special character.';
+        return 'Password must be at least 8 characters long, include an uppercase letter, a lowercase letter, a number, and a special character.';
       }
     }
+
     return null;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isOtp) {
+      return PinCodeTextField(
+        appContext: context,
+        length: 6,
+        controller: widget.controller,
+        keyboardType: TextInputType.number,
+        obscureText: false,
+        animationType: AnimationType.fade,
+        pinTheme: PinTheme(
+          shape: PinCodeFieldShape.box,
+          borderRadius: BorderRadius.circular(5),
+          fieldHeight: 50,
+          fieldWidth: 40,
+          activeFillColor: Colors.white,
+          selectedFillColor: Colors.grey[200],
+          inactiveFillColor: Colors.grey[300],
+        ),
+        animationDuration: const Duration(milliseconds: 300),
+        enableActiveFill: true,
+        onCompleted: (value) {},
+        onChanged: (value) {},
+      );
+    }
+
     return TextFormField(
       controller: widget.controller,
       obscureText: widget.isPassword ? _obscureText : false,

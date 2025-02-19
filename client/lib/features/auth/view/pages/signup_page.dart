@@ -1,5 +1,5 @@
 import 'package:client/core/widgets/loader.dart';
-import 'package:client/features/auth/view/pages/login_page.dart';
+import 'package:client/features/auth/view/pages/otp_page.dart';
 import 'package:client/features/auth/view/widgets/auth_gradient_button.dart';
 import 'package:client/features/auth/view/widgets/custom_field.dart';
 import 'package:client/features/auth/viewmodel/auth_viewmodel.dart';
@@ -38,13 +38,13 @@ class _SignupPageState extends ConsumerState<SignupPage> {
               ..hideCurrentSnackBar()
               ..showSnackBar(
                 const SnackBar(
-                  content: Text('Account created! Please login'),
+                  content: Text('An OTP has been sent to your email!'),
                 ),
               );
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const LoginPage(),
+                builder: (context) => OTPPage(email: emailController.text),
               ),
             );
           },
@@ -68,13 +68,12 @@ class _SignupPageState extends ConsumerState<SignupPage> {
           : Padding(
               padding: const EdgeInsets.all(15.0),
               child: SingleChildScrollView(
-                // Wrap with this
                 child: Form(
                   key: formKey,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 20), // Extra spacing
+                      const SizedBox(height: 20),
                       const Text(
                         'Sign Up.',
                         style: TextStyle(
@@ -110,7 +109,7 @@ class _SignupPageState extends ConsumerState<SignupPage> {
                           }
                         },
                       ),
-                      const SizedBox(height: 20), // Extra spacing
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),

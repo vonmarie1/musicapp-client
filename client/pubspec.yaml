@@ -44,6 +44,7 @@ dependencies:
   firebase_admin: ^0.3.0+1
   firebase_core: ^3.11.0
   firebase_auth: ^5.4.2
+  pin_code_fields: ^8.0.1
 
 dev_dependencies:
   flutter_test:
