@@ -17,9 +17,11 @@ class _CreateAccountState extends State<CreateAccount> {
           padding: const EdgeInsets.all(15),
           decoration: const BoxDecoration(
             image: DecorationImage(
-                image: NetworkImage(
-                    'https://i.pinimg.com/736x/29/55/a3/2955a3f295bd994427a4782e7a8459a6.jpg'),
-                fit: BoxFit.cover),
+              image: NetworkImage(
+                'https://i.pinimg.com/736x/29/55/a3/2955a3f295bd994427a4782e7a8459a6.jpg',
+              ),
+              fit: BoxFit.cover,
+            ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
