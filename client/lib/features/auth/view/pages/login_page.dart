@@ -25,15 +25,56 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> login() async {
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text,
-        password: passwordController.text,
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
-      print('Login successful');
+
+      final user = userCredential.user;
+      print("✅ User logged in: ${user?.email}");
+
+      // Check if email is verified
+      if (user != null && !user.emailVerified) {
+        print("❌ Email not verified");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Please verify your email before logging in.')),
+        );
+        FirebaseAuth.instance.signOut(); // Prevent access
+        return;
+      }
+
+      print("✅ Email verified, proceeding to dashboard...");
+
+      // // Navigate to home page (or dashboard)
+      // Navigator.pushReplacement(
+      //   context,
+      //   MaterialPageRoute(builder: (context) => const HomePage()),
+      // );
     } catch (e) {
-      print('Login failed: $e');
+      print("❌ Login failed: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        SnackBar(content: Text('Login failed: $e')),
+      );
+    }
+  }
+
+  Future<void> resendVerificationEmail() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        print("📩 Verification email resent to ${user.email}");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Verification email resent!')),
+        );
+      }
+    } catch (e) {
+      print("❌ Error resending email: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error resending email: $e')),
       );
     }
   }
@@ -69,6 +110,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               onTap: () async {
                 await login();
               },
+            ),
+            TextButton(
+              onPressed: resendVerificationEmail,
+              child: const Text("Resend Verification Email"),
             ),
           ],
         ),
