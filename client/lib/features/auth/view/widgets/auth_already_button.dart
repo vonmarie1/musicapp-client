@@ -14,8 +14,8 @@ class AuthAlreadyButton extends StatelessWidget {
         height: 55,
         child: ElevatedButton(
           onPressed: () {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const LoginPage()));
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => LoginPage()));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,

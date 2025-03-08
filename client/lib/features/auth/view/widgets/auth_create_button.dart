@@ -14,8 +14,8 @@ class AuthCreateButton extends StatelessWidget {
         height: 55,
         child: ElevatedButton(
           onPressed: () {
-            Navigator.push(context,
-                MaterialPageRoute(builder: (context) => const SignupPage()));
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => SignUpPage()));
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.transparent,

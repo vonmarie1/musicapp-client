@@ -1,54 +1,39 @@
-import 'dart:convert';
-
 class UserModel {
+  final String id;
   final String name;
   final String email;
-  final String id;
   final String token;
 
   UserModel({
+    required this.id,
     required this.name,
     required this.email,
-    required this.id,
     required this.token,
   });
 
-  UserModel copyWith({
-    String? name,
-    String? email,
-    String? id,
-    String? token,
-  }) {
+  // Updated to match your backend response format
+  factory UserModel.fromMap(Map<String, dynamic> map) {
+    // For login response from auth.py: {"token": "...", "user": {...}}
+    // For signup response from auth.py: {"message": "...", "user": {...}}
+    final userData = map['user'] as Map<String, dynamic>;
+
     return UserModel(
-      name: name ?? this.name,
-      email: email ?? this.email,
-      id: id ?? this.id,
-      token: token ?? this.token,
+      id: userData['id'] as String,
+      name: userData['name'] as String,
+      email: userData['email'] as String,
+      token: map['token'] as String? ?? '', // Token is at top level
     );
   }
 
   Map<String, dynamic> toMap() {
-    return <String, dynamic>{
+    // Format matches the request format expected by your backend
+    return {
       'name': name,
       'email': email,
       'id': id,
       'token': token,
     };
   }
-
-  factory UserModel.fromMap(Map<String, dynamic> map) {
-    return UserModel(
-      name: map['name'] ?? '',
-      email: map['email'] ?? '',
-      id: map['id'] ?? '',
-      token: map['token'] ?? '',
-    );
-  }
-
-  String toJson() => json.encode(toMap());
-
-  factory UserModel.fromJson(String source) =>
-      UserModel.fromMap(json.decode(source) as Map<String, dynamic>);
 
   @override
   String toString() {

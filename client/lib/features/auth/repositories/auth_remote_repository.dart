@@ -10,7 +10,7 @@ class AuthRemoteRepository {
       required String email,
       required String password}) async {
     final response = await http.post(
-      Uri.parse("${ServerConstans.serverURL}/auth/signup"),
+      Uri.parse("${ServerConstants.serverURL}/auth/signup"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "name": name,

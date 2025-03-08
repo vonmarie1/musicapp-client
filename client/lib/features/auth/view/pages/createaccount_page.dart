@@ -1,7 +1,7 @@
-import 'package:client/features/auth/view/widgets/auth_already_button.dart';
-import 'package:client/features/auth/view/widgets/auth_create_button.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../widgets/auth_already_button.dart';
+import '../widgets/auth_create_button.dart';
 
 class CreateAccount extends StatefulWidget {
   const CreateAccount({super.key});
@@ -16,11 +16,13 @@ class _CreateAccountState extends State<CreateAccount> {
         body: Container(
           padding: const EdgeInsets.all(15),
           decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: NetworkImage(
-                'https://i.pinimg.com/736x/29/55/a3/2955a3f295bd994427a4782e7a8459a6.jpg',
-              ),
-              fit: BoxFit.cover,
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFFFF0000), // Bright red
+                Color(0xFFFFD700), // Gold/yellow
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
           ),
           child: Column(
