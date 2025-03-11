@@ -5,10 +5,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../services/api_service.dart';
 import '../pages/profile_page.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:dio/dio.dart';
 import 'music_player_page.dart';
 import 'package:provider/provider.dart';
+import 'package:client/provider/audio_provider.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -37,7 +37,7 @@ class _HomePageState extends State<HomePage>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // Add a small delay to ensure the widget is fully mounted
+    // small delay to ensure the widget is fully mounted
     Future.delayed(Duration.zero, () {
       _loadInitialContent();
       _loadRecentSearches();
@@ -117,7 +117,7 @@ class _HomePageState extends State<HomePage>
     }
 
     try {
-      // Use the API service to search YouTube
+      // API service to search YouTube
       final Map<String, dynamic> response =
           await _apiService.searchYouTube(query);
 
@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage>
           isLoading = false;
         });
 
-        // Show error snackbar
+        // Show error
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load videos. Please try again.'),
@@ -159,6 +159,8 @@ class _HomePageState extends State<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    final audioProvider = Provider.of<AudioProvider>(context, listen: false);
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -176,7 +178,7 @@ class _HomePageState extends State<HomePage>
                 child:
                     isSearching ? _buildSearchResults() : _buildHomeContent(),
               ),
-              MiniPlayer(), // Add this line
+              MiniPlayer(), // Mini player at the bottom
             ],
           ),
         ),
@@ -261,6 +263,7 @@ class _HomePageState extends State<HomePage>
     return isLoading
         ? Center(child: CircularProgressIndicator(color: Colors.white))
         : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -283,6 +286,7 @@ class _HomePageState extends State<HomePage>
                   ],
                 ),
               ),
+              // Instead of Expanded, use Flexible or give ListView a bounded height
               Expanded(
                 child: ListView.builder(
                   itemCount: videos.length,
@@ -306,10 +310,11 @@ class _HomePageState extends State<HomePage>
                         style: TextStyle(color: Colors.white70),
                       ),
                       onTap: () => _playVideo(
-                          video['id']['videoId'],
-                          video['snippet']['title'],
-                          video['snippet']['channelTitle'],
-                          video['snippet']['thumbnails']['high']['url']),
+                        video['id']['videoId'],
+                        video['snippet']['title'],
+                        video['snippet']['channelTitle'],
+                        video['snippet']['thumbnails']['high']['url'],
+                      ),
                     );
                   },
                 ),
@@ -333,8 +338,8 @@ class _HomePageState extends State<HomePage>
             ),
           ),
         ),
-        Container(
-          height: 200,
+        SizedBox(
+          height: 150,
           child: ListView.builder(
             padding: EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
@@ -357,7 +362,7 @@ class _HomePageState extends State<HomePage>
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
                           video['snippet']['thumbnails']['high']['url'],
-                          height: 160,
+                          height: 100,
                           width: 160,
                           fit: BoxFit.cover,
                         ),

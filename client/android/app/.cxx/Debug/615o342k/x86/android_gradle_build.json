@@ -1,0 +1,28 @@
+{
+  "buildFiles": [
+    "/Users/vonmarviscayno/Development/flutter/packages/flutter_tools/gradle/src/main/groovy/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/vonmarviscayno/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/vonmarviscayno/Development/projects/musicapp-client/client/android/app/.cxx/Debug/615o342k/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/vonmarviscayno/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/vonmarviscayno/Development/projects/musicapp-client/client/android/app/.cxx/Debug/615o342k/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {},
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/Users/vonmarviscayno/Library/Android/sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/Users/vonmarviscayno/Library/Android/sdk/ndk/26.3.11579264/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": []
+}

@@ -33,9 +33,7 @@ class ApiService {
         print("Signup response: $responseData");
         return UserModel.fromMap(responseData);
       } else {
-        final errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ??
-            "Sign-up failed with status code: ${response.statusCode}");
+        throw Exception("Email already taken!");
       }
     } catch (e) {
       print("Error during signup: $e");
@@ -280,17 +278,16 @@ class ApiService {
 
       // Remove the backend call for now since the endpoint is not ready
       // When the backend is ready, you can uncomment this part
-      /*
-    if (song['id']?['videoId'] != null) {
-      await http.post(
-        Uri.parse("$baseUrl/users/history"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "video_id": song['id']['videoId'],
-        }),
-      );
-    }
-    */
+
+      if (song['id']?['videoId'] != null) {
+        await http.post(
+          Uri.parse("$baseUrl/users/history"),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode({
+            "video_id": song['id']['videoId'],
+          }),
+        );
+      }
     } catch (e) {
       print("Error adding to recently played: $e");
       // Continue even if save fails

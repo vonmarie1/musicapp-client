@@ -1,10 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? _user;
   bool _isLoading = false;
 
@@ -19,90 +17,77 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signUp(
+      String name, String email, String password, BuildContext context) async {
     try {
       _isLoading = true;
       notifyListeners();
 
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  Future<void> signUp(String name, String email, String password) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-
-      // Create user in Firebase Auth
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Save additional user data to Firestore
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
-        'name': name,
-        'email': email,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Send verification email
+      await userCredential.user?.sendEmailVerification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Verification email sent. Please check your inbox.')),
+      );
 
       _isLoading = false;
       notifyListeners();
     } catch (e) {
       _isLoading = false;
       notifyListeners();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign-up failed: ${e.toString()}')),
+      );
       rethrow;
     }
   }
 
-  Future<void> saveRecentSearch(String query) async {
-    if (_user != null) {
-      try {
-        await _firestore
-            .collection('users')
-            .doc(_user!.uid)
-            .collection('searches')
-            .add({
-          'query': query,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        print('Error saving search: $e');
+  Future<void> signIn(
+      String email, String password, BuildContext context) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+
+      await _user?.reload();
+      if (_user != null && !_user!.emailVerified) {
+        await _auth.signOut();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Email not verified. Please check your inbox.')),
+        );
+        return;
       }
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: ${e.toString()}')),
+      );
+      rethrow;
     }
   }
 
-  Future<List<String>> getRecentSearches() async {
-    List<String> searches = [];
+  Future<bool> checkEmailVerified() async {
+    await _user?.reload();
+    _user = _auth.currentUser;
+    notifyListeners();
+    return _user?.emailVerified ?? false;
+  }
 
-    if (_user != null) {
-      try {
-        QuerySnapshot querySnapshot = await _firestore
-            .collection('users')
-            .doc(_user!.uid)
-            .collection('searches')
-            .orderBy('timestamp', descending: true)
-            .limit(5)
-            .get();
-
-        searches =
-            querySnapshot.docs.map((doc) => doc['query'] as String).toList();
-      } catch (e) {
-        print('Error getting recent searches: $e');
-      }
+  Future<void> sendVerificationEmail() async {
+    if (_user != null && !_user!.emailVerified) {
+      await _user!.sendEmailVerification();
     }
-
-    return searches;
   }
 }

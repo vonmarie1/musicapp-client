@@ -1,3 +1,4 @@
+import 'package:client/features/auth/view/pages/background_player.dart';
 import 'package:client/provider/audio_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +14,6 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
   SystemChrome.setSystemUIOverlayStyle(
     SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -40,6 +40,15 @@ class MyApp extends StatelessWidget {
       title: 'Zymphony',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightThemeMode,
+      builder: (context, child) {
+        // Wrap the entire app with a stack that includes the background player
+        return Stack(
+          children: [
+            child!,
+            const BackgroundPlayer(), // This stays alive throughout the app
+          ],
+        );
+      },
       home: const CreateAccount(),
     );
   }

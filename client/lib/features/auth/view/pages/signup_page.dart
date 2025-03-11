@@ -1,4 +1,4 @@
-import 'package:client/features/auth/view/pages/home_page.dart';
+import 'package:client/features/auth/view/pages/email_verification_page.dart';
 import 'package:client/services/api_service.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -31,7 +31,7 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _apiService.signUp(
+      final userModel = await _apiService.signUp(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text,
@@ -40,7 +40,9 @@ class _SignUpPageState extends State<SignUpPage> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+          MaterialPageRoute(
+            builder: (context) => EmailVerificationPage(),
+          ),
         );
       }
     } catch (e) {

@@ -1,0 +1,2 @@
+/Users/vonmarviscayno/Development/projects/musicapp-client/client/android/app/.cxx/Debug/615o342k/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/vonmarviscayno/Development/projects/musicapp-client/client/android/app/.cxx/Debug/615o342k/armeabi-v7a/CMakeFiles/rebuild_cache.dir

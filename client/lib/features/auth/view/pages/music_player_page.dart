@@ -23,19 +23,19 @@ class MusicPlayerPage extends StatefulWidget {
   _MusicPlayerPageState createState() => _MusicPlayerPageState();
 }
 
-class _MusicPlayerPageState extends State<MusicPlayerPage> {
+class _MusicPlayerPageState extends State<MusicPlayerPage>
+    with WidgetsBindingObserver {
   late AudioProvider audioProvider;
   bool _isVideoMode = false;
   bool _isPlaying = false;
-  bool _isDisposed = false;
   final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    audioProvider = Provider.of<AudioProvider>(context, listen: false);
+    WidgetsBinding.instance.addObserver(this);
 
-    // Initialize the song
+    audioProvider = Provider.of<AudioProvider>(context, listen: false);
     audioProvider.setCurrentSong(
       videoId: widget.videoId,
       title: widget.title,
@@ -48,10 +48,18 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes to keep audio playing
+    if (state == AppLifecycleState.resumed) {
+      if (audioProvider.controller != null && _isPlaying) {
+        audioProvider.controller!.play();
+      }
+    }
+  }
+
+  @override
   void dispose() {
-    _isDisposed = true;
-    // Tell the provider we're going to background mode
-    audioProvider.enterBackground();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -69,98 +77,17 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     await _apiService.addToRecentlyPlayed(song);
   }
 
-  // New method to switch back to audio mode when leaving the page
-  void _switchToAudioMode() {
-    if (_isDisposed) return;
-
-    final currentTime = audioProvider.controller!.value.position;
-    final wasPlaying = audioProvider.controller!.value.isPlaying;
-
-    // Remove our listener
-    audioProvider.controller!.removeListener(_onPlayerStateChange);
-
-    // Create a new controller for audio-only mode
-    YoutubePlayerController newController = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: YoutubePlayerFlags(
-        autoPlay: wasPlaying,
-        mute: false,
-        hideControls: true,
-        hideThumbnail: true,
-      ),
-    );
-
-    // Update the provider with the new controller
-    audioProvider.updateController(newController, wasPlaying);
-
-    // Seek to the current position
-    Future.delayed(Duration(milliseconds: 500), () {
-      if (!audioProvider.isDisposed) {
-        audioProvider.seekTo(currentTime);
-      }
-    });
-  }
-
-  void _onPlayerStateChange() {
-    if (!_isDisposed && mounted) {
-      setState(() {
-        _isPlaying = audioProvider.controller!.value.isPlaying;
-      });
-    }
-  }
-
   void _togglePlaybackMode() {
-    if (_isDisposed) return;
-
     setState(() {
       _isVideoMode = !_isVideoMode;
-      final currentTime = audioProvider.controller!.value.position;
-      final wasPlaying = audioProvider.controller!.value.isPlaying;
-
-      // Remove our listener
-      audioProvider.controller!.removeListener(_onPlayerStateChange);
-
-      // Create a new controller with updated settings
-      YoutubePlayerController newController = YoutubePlayerController(
-        initialVideoId: widget.videoId,
-        flags: YoutubePlayerFlags(
-          autoPlay: wasPlaying,
-          mute: false,
-          disableDragSeek: false,
-          loop: false,
-          isLive: false,
-          forceHD: true,
-          enableCaption: false,
-          hideControls: !_isVideoMode,
-          hideThumbnail: !_isVideoMode,
-        ),
-      );
-
-      // Update the controller in the provider
-      audioProvider.updateController(newController, wasPlaying);
-
-      // Get the updated controller
-      //_controller = audioProvider.controller!;
-      audioProvider.controller!.addListener(_onPlayerStateChange);
-
-      // Seek to the previous position
-      if (!_isDisposed && mounted) {
-        Future.delayed(Duration(milliseconds: 500), () {
-          if (!_isDisposed && mounted) {
-            audioProvider.controller!.seekTo(currentTime);
-            if (wasPlaying) {
-              audioProvider.controller!.play();
-            }
-          }
-        });
-      }
     });
   }
 
   void _togglePlayPause() {
-    if (_isDisposed) return;
-
     audioProvider.togglePlayPause();
+    setState(() {
+      _isPlaying = audioProvider.isPlaying;
+    });
   }
 
   @override
@@ -188,23 +115,20 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   _buildControlBar(),
                 ],
               ),
-              // Keep the player alive even in audio mode
-              Opacity(
-                opacity: 0,
-                child: SizedBox(
-                  height: 0,
-                  child: Consumer<AudioProvider>(
-                    builder: (context, provider, child) {
-                      return provider.controller != null
-                          ? YoutubePlayer(
-                              controller: provider.controller!,
-                              showVideoProgressIndicator: false,
-                            )
-                          : SizedBox.shrink();
-                    },
+              // Hidden player for audio-only mode
+              if (!_isVideoMode && audioProvider.controller != null)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  child: SizedBox(
+                    height: 1,
+                    width: 1,
+                    child: YoutubePlayer(
+                      controller: audioProvider.controller!,
+                      showVideoProgressIndicator: false,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -212,7 +136,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     );
   }
 
-  // Rest of the widget methods remain the same...
   Widget _buildAppBar() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -261,14 +184,16 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   Widget _buildVideoPlayer() {
     return Container(
       color: Colors.black,
-      child: YoutubePlayer(
-        controller: audioProvider.controller!,
-        showVideoProgressIndicator: true,
-        progressColors: ProgressBarColors(
-          playedColor: Colors.red,
-          handleColor: Colors.redAccent,
-        ),
-      ),
+      child: audioProvider.controller != null
+          ? YoutubePlayer(
+              controller: audioProvider.controller!,
+              showVideoProgressIndicator: true,
+              progressColors: ProgressBarColors(
+                playedColor: Colors.red,
+                handleColor: Colors.redAccent,
+              ),
+            )
+          : Center(child: CircularProgressIndicator()),
     );
   }
 
