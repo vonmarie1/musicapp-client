@@ -12,32 +12,24 @@ class ApiService {
   final String baseUrl = ServerConstants.serverURL;
 
   // Authentication Methods
-  Future<UserModel> signUp({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/auth/signup"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "name": name,
-          "email": email,
-          "password": password,
-        }),
-      );
+  Future<Map<String, dynamic>> signUp(
+      {required String name,
+      required String email,
+      required String password}) async {
+    final response = await http.post(
+      Uri.parse("${ServerConstants.serverURL}/auth/signup"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "name": name,
+        "email": email,
+        "password": password,
+      }),
+    );
 
-      if (response.statusCode == 201) {
-        final responseData = jsonDecode(response.body);
-        print("Signup response: $responseData");
-        return UserModel.fromMap(responseData);
-      } else {
-        throw Exception("Email already taken!");
-      }
-    } catch (e) {
-      print("Error during signup: $e");
-      throw Exception("Sign-up failed: $e");
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Sign-up failed: ${response.body}");
     }
   }
 
@@ -137,6 +129,10 @@ class ApiService {
       print("Error updating profile: $e");
       throw Exception("Failed to update profile: $e");
     }
+  }
+
+  Future<void> signOut() async {
+    await Future.delayed(Duration(milliseconds: 500));
   }
 
   // Playlist methods

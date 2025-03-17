@@ -1,5 +1,5 @@
 import 'package:client/features/auth/view/pages/home_page.dart';
-import 'package:client/services/api_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'signup_page.dart';
@@ -11,11 +11,10 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  final ApiService _apiService = ApiService();
 
   @override
   void dispose() {
@@ -30,10 +29,30 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _apiService.login(
+      final userCredential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
+        password: _passwordController.text.trim(),
       );
+
+      final user = userCredential.user;
+      print("✅ User logged in: ${user?.email}");
+
+      if (user != null && !user.emailVerified) {
+        print("❌ Email not verified");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Please verify your email before logging in.')),
+          );
+        }
+
+        await FirebaseAuth.instance.signOut();
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      print("✅ Email verified, proceeding to dashboard...");
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -42,12 +61,10 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
+      print("❌ Login Failed: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Login failed: $e')),
         );
       }
     } finally {
@@ -64,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFF0000), Color(0xFFFFD700)],
             begin: Alignment.topLeft,
@@ -74,17 +91,17 @@ class _LoginPageState extends State<LoginPage> {
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24.0),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    SizedBox(height: 32),
+                    const SizedBox(height: 32),
                     Text(
                       'Log in.',
                       style: GoogleFonts.roboto(
@@ -93,31 +110,22 @@ class _LoginPageState extends State<LoginPage> {
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 48),
+                    const SizedBox(height: 48),
                     TextFormField(
                       controller: _emailController,
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Email',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.email, color: Colors.white70),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon:
+                            const Icon(Icons.email, color: Colors.white70),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: const BorderSide(color: Colors.white24),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
                       ),
                       validator: (value) {
@@ -130,17 +138,16 @@ class _LoginPageState extends State<LoginPage> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.lock, color: Colors.white70),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon:
+                            const Icon(Icons.lock, color: Colors.white70),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
@@ -156,19 +163,11 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: const BorderSide(color: Colors.white24),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
                       ),
                       validator: (value) {
@@ -181,7 +180,7 @@ class _LoginPageState extends State<LoginPage> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 48),
+                    const SizedBox(height: 48),
                     SizedBox(
                       width: double.infinity,
                       height: 56,
@@ -195,8 +194,8 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         child: _isLoading
-                            ? CircularProgressIndicator()
-                            : Text(
+                            ? const CircularProgressIndicator()
+                            : const Text(
                                 'Log In',
                                 style: TextStyle(
                                   fontSize: 18,
@@ -205,26 +204,11 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                       ),
                     ),
-                    SizedBox(height: 24),
-                    Center(
-                      child: TextButton(
-                        onPressed: () {
-                          // Add forgot password functionality
-                        },
-                        child: Text(
-                          'Resend Verification Email',
-                          style: TextStyle(
-                            color: Colors.white,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           "Don't have an account? ",
                           style: TextStyle(color: Colors.white70),
                         ),
@@ -233,11 +217,11 @@ class _LoginPageState extends State<LoginPage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => SignUpPage(),
+                                builder: (context) => SignupPage(),
                               ),
                             );
                           },
-                          child: Text(
+                          child: const Text(
                             'Sign Up',
                             style: TextStyle(
                               color: Colors.white,

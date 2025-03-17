@@ -1,21 +1,21 @@
+import 'package:client/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../pages/createaccount_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:client/features/auth/model/user_model.dart';
 
-class ProfilePage extends StatelessWidget {
-  final User? currentUser = FirebaseAuth.instance.currentUser;
-
+class ProfilePage extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final UserModel? userModel = ref.watch(authStateProvider).value;
+    final User? firebaseUser = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFFF0000), // Bright red
-              Color(0xFFFFD700), // Gold/yellow
-            ],
+            colors: [Color(0xFFFF0000), Color(0xFFFFD700)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -26,12 +26,12 @@ class ProfilePage extends StatelessWidget {
               _buildAppBar(context),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      _buildProfileHeader(),
-                      SizedBox(height: 24),
-                      _buildSettingsSection(context),
+                      _buildProfileHeader(userModel, firebaseUser),
+                      const SizedBox(height: 24),
+                      _buildSettingsSection(context, ref),
                     ],
                   ),
                 ),
@@ -49,12 +49,10 @@ class ProfilePage extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             'Profile',
             style: GoogleFonts.roboto(
@@ -68,28 +66,28 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(UserModel? userModel, User? firebaseUser) {
     return Column(
       children: [
         CircleAvatar(
           radius: 50,
-          backgroundImage: currentUser?.photoURL != null
-              ? NetworkImage(currentUser!.photoURL!)
-              : NetworkImage('https://via.placeholder.com/150'),
+          backgroundImage: firebaseUser?.photoURL != null
+              ? NetworkImage(firebaseUser!.photoURL!)
+              : const NetworkImage('https://via.placeholder.com/150'),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         Text(
-          currentUser?.displayName ?? 'User',
+          userModel?.name ?? firebaseUser?.displayName ?? 'User',
           style: GoogleFonts.roboto(
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
-          currentUser?.email ?? 'email@example.com',
-          style: TextStyle(
+          userModel?.email ?? firebaseUser?.email ?? 'email@example.com',
+          style: const TextStyle(
             fontSize: 16,
             color: Colors.white70,
           ),
@@ -98,14 +96,14 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsSection(BuildContext context) {
+  Widget _buildSettingsSection(BuildContext context, WidgetRef ref) {
     return Card(
       color: Colors.white.withOpacity(0.2),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -117,7 +115,7 @@ class ProfilePage extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildSettingItem(
               icon: Icons.person,
               title: 'Edit Profile',
@@ -143,10 +141,9 @@ class ProfilePage extends StatelessWidget {
               title: 'Logout',
               onTap: () async {
                 await FirebaseAuth.instance.signOut();
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => CreateAccount()),
-                  (route) => false,
-                );
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
               },
             ),
           ],
@@ -164,9 +161,9 @@ class ProfilePage extends StatelessWidget {
       leading: Icon(icon, color: Colors.white),
       title: Text(
         title,
-        style: TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.white),
       ),
-      trailing: Icon(Icons.chevron_right, color: Colors.white70),
+      trailing: const Icon(Icons.chevron_right, color: Colors.white70),
       onTap: onTap,
     );
   }

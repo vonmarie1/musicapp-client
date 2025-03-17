@@ -1,7 +1,8 @@
 import 'package:client/features/auth/model/user_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../services/api_service.dart';
-
 
 final authServiceProvider = Provider<ApiService>((ref) {
   return ApiService();
@@ -15,6 +16,8 @@ final authStateProvider =
 
 class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final ApiService _apiService;
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   AuthNotifier(this._apiService) : super(const AsyncValue.data(null));
 
@@ -32,24 +35,14 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     }
   }
 
-  Future<void> signUp({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signOut() async {
     state = const AsyncValue.loading();
-
     try {
-      final user = await _apiService.signUp(
-        name: name,
-        email: email,
-        password: password,
-      );
-      state = AsyncValue.data(user);
+      await _firebaseAuth.signOut();
+      await _secureStorage.delete(key: 'auth_token');
+      state = const AsyncValue.data(null);
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
     }
   }
-
-  
 }

@@ -90,4 +90,8 @@ class AuthService extends ChangeNotifier {
       await _user!.sendEmailVerification();
     }
   }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
 }

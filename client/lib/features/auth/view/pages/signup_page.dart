@@ -1,62 +1,86 @@
-import 'package:client/features/auth/view/pages/email_verification_page.dart';
-import 'package:client/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:client/features/auth/repositories/auth_remote_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class SignUpPage extends StatefulWidget {
+class SignupPage extends ConsumerStatefulWidget {
+  const SignupPage({super.key});
+
   @override
-  _SignUpPageState createState() => _SignUpPageState();
+  ConsumerState<SignupPage> createState() => _SignupPageState();
 }
 
-class _SignUpPageState extends State<SignUpPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLoading = false;
-  bool _obscurePassword = true;
-  final ApiService _apiService = ApiService();
+class _SignupPageState extends ConsumerState<SignupPage> {
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  bool isLoading = false;
+  bool obscurePassword = true;
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+  Future<void> signUp() async {
+    if (!formKey.currentState!.validate()) return;
 
-  Future<void> _signUp() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
+    setState(() => isLoading = true);
 
     try {
-      final userModel = await _apiService.signUp(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
 
+      final user = userCredential.user;
+      print("✅ Firebase Auth success: ${user?.uid}");
+
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        print("📩 Verification email sent to ${user.email}");
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Verification email sent! Please check your inbox.')),
+          );
+        }
+      }
+
+      final response = await AuthRemoteRepository().signUp(
+        name: nameController.text.trim(),
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      print("✅ FastAPI response: $response");
+
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EmailVerificationPage(),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Verify Your Email"),
+            content: const Text(
+                "A verification email has been sent. Please verify before logging in."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
           ),
         );
       }
     } catch (e) {
+      print("❌ Sign-up failed: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign up failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Sign-up failed: $e')),
         );
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() => isLoading = false);
       }
     }
   }
@@ -68,7 +92,7 @@ class _SignUpPageState extends State<SignUpPage> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFF0000), Color(0xFFFFD700)],
             begin: Alignment.topLeft,
@@ -78,17 +102,17 @@ class _SignUpPageState extends State<SignUpPage> {
         child: SafeArea(
           child: SingleChildScrollView(
             child: Padding(
-              padding: EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24.0),
               child: Form(
-                key: _formKey,
+                key: formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.arrow_back, color: Colors.white),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                     ),
-                    SizedBox(height: 32),
+                    const SizedBox(height: 32),
                     Text(
                       'Sign Up.',
                       style: GoogleFonts.roboto(
@@ -97,32 +121,23 @@ class _SignUpPageState extends State<SignUpPage> {
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 48),
+                    const SizedBox(height: 48),
                     TextFormField(
-                      controller: _nameController,
-                      style: TextStyle(color: Colors.white),
+                      controller: nameController,
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Name',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.person, color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon:
+                            const Icon(Icons.person, color: Colors.white70),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: const BorderSide(color: Colors.white24),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -131,32 +146,23 @@ class _SignUpPageState extends State<SignUpPage> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     TextFormField(
-                      controller: _emailController,
-                      style: TextStyle(color: Colors.white),
+                      controller: emailController,
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Email',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.email, color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon:
+                            const Icon(Icons.email, color: Colors.white70),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: const BorderSide(color: Colors.white24),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -168,46 +174,37 @@ class _SignUpPageState extends State<SignUpPage> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: TextStyle(color: Colors.white),
+                      controller: passwordController,
+                      obscureText: obscurePassword,
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        labelStyle: TextStyle(color: Colors.white70),
-                        prefixIcon: Icon(Icons.lock, color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        prefixIcon:
+                            const Icon(Icons.lock, color: Colors.white70),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword
+                            obscurePassword
                                 ? Icons.visibility
                                 : Icons.visibility_off,
                             color: Colors.white70,
                           ),
                           onPressed: () {
                             setState(() {
-                              _obscurePassword = !_obscurePassword;
+                              obscurePassword = !obscurePassword;
                             });
                           },
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white24),
+                          borderSide: const BorderSide(color: Colors.white24),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.white),
+                          borderSide: const BorderSide(color: Colors.white),
                         ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide(color: Colors.red),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.1),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
@@ -219,12 +216,12 @@ class _SignUpPageState extends State<SignUpPage> {
                         return null;
                       },
                     ),
-                    SizedBox(height: 48),
+                    const SizedBox(height: 48),
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _signUp,
+                        onPressed: isLoading ? null : signUp,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: Colors.red,
@@ -232,33 +229,28 @@ class _SignUpPageState extends State<SignUpPage> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
-                        child: _isLoading
-                            ? CircularProgressIndicator()
-                            : Text(
+                        child: isLoading
+                            ? const CircularProgressIndicator()
+                            : const Text(
                                 'Sign Up',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                       ),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Already have an account? ',
-                          style: TextStyle(color: Colors.white70),
-                        ),
+                        const Text("Already have an account? ",
+                            style: TextStyle(color: Colors.white70)),
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text(
+                          child: const Text(
                             'Log In',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
