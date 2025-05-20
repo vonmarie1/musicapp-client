@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show Platform;
 
 class MusicPlayerPage extends StatefulWidget {
   final String videoId;
@@ -23,19 +24,19 @@ class MusicPlayerPage extends StatefulWidget {
   _MusicPlayerPageState createState() => _MusicPlayerPageState();
 }
 
-class _MusicPlayerPageState extends State<MusicPlayerPage>
-    with WidgetsBindingObserver {
+class _MusicPlayerPageState extends State<MusicPlayerPage> {
   late AudioProvider audioProvider;
   bool _isVideoMode = false;
   bool _isPlaying = false;
+  bool _isDisposed = false;
   final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-
     audioProvider = Provider.of<AudioProvider>(context, listen: false);
+
+    // Initialize just the current song
     audioProvider.setCurrentSong(
       videoId: widget.videoId,
       title: widget.title,
@@ -44,22 +45,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     );
 
     _isPlaying = audioProvider.isPlaying;
+    audioProvider.controller?.addListener(_onPlayerStateChange);
     _addToRecentlyPlayed();
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app lifecycle changes to keep audio playing
-    if (state == AppLifecycleState.resumed) {
-      if (audioProvider.controller != null && _isPlaying) {
-        audioProvider.controller!.play();
-      }
-    }
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    _isDisposed = true;
+    audioProvider.controller?.removeListener(_onPlayerStateChange);
     super.dispose();
   }
 
@@ -77,17 +70,68 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     await _apiService.addToRecentlyPlayed(song);
   }
 
+  void _onPlayerStateChange() {
+    if (!_isDisposed && mounted) {
+      setState(() {
+        _isPlaying = audioProvider.controller!.value.isPlaying;
+      });
+    }
+  }
+
   void _togglePlaybackMode() {
+    if (_isDisposed) return;
+
     setState(() {
       _isVideoMode = !_isVideoMode;
+      final currentTime = audioProvider.controller!.value.position;
+      final wasPlaying = audioProvider.controller!.value.isPlaying;
+
+      // Remove our listener
+      audioProvider.controller!.removeListener(_onPlayerStateChange);
+
+      // Create a new controller with updated settings
+      YoutubePlayerController newController = YoutubePlayerController(
+        initialVideoId: audioProvider.currentVideoId!,
+        flags: YoutubePlayerFlags(
+          autoPlay: wasPlaying,
+          mute: false,
+          disableDragSeek: false,
+          loop: false,
+          isLive: false,
+          forceHD: true,
+          enableCaption: false,
+          hideControls: !_isVideoMode,
+          hideThumbnail: !_isVideoMode,
+        ),
+      );
+
+      // Clean up old controller
+      if (audioProvider.controller != null) {
+        audioProvider.controller!.removeListener(_onPlayerStateChange);
+        audioProvider.controller!.dispose();
+      }
+
+      // Set new controller
+      audioProvider.controller = newController;
+      audioProvider.controller!.addListener(_onPlayerStateChange);
+
+      // Seek to the previous position
+      if (!_isDisposed && mounted) {
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (!_isDisposed && mounted) {
+            audioProvider.controller!.seekTo(currentTime);
+            if (wasPlaying) {
+              audioProvider.controller!.play();
+            }
+          }
+        });
+      }
     });
   }
 
   void _togglePlayPause() {
+    if (_isDisposed) return;
     audioProvider.togglePlayPause();
-    setState(() {
-      _isPlaying = audioProvider.isPlaying;
-    });
   }
 
   @override
@@ -115,19 +159,34 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                   _buildControlBar(),
                 ],
               ),
-              // Hidden player for audio-only mode
-              if (!_isVideoMode && audioProvider.controller != null)
+              // Hidden YouTube player for audio-only mode
+              // Modified to work on iOS
+              if (!_isVideoMode)
                 Positioned(
-                  bottom: 0,
-                  left: 0,
-                  child: SizedBox(
-                    height: 1,
-                    width: 1,
-                    child: YoutubePlayer(
-                      controller: audioProvider.controller!,
-                      showVideoProgressIndicator: false,
-                    ),
-                  ),
+                  // Position it off-screen but still active
+                  bottom: Platform.isIOS ? -1000 : null, // Off-screen for iOS
+                  left: Platform.isIOS ? 0 : null,
+                  child: Platform.isIOS
+                      // For iOS: Keep a small visible size but position off-screen
+                      ? SizedBox(
+                          width: 1, // Tiny but not zero
+                          height: 1, // Tiny but not zero
+                          child: YoutubePlayer(
+                            controller: audioProvider.controller!,
+                            showVideoProgressIndicator: false,
+                          ),
+                        )
+                      // For Android: Use opacity approach
+                      : Opacity(
+                          opacity: 0,
+                          child: SizedBox(
+                            height: 0,
+                            child: YoutubePlayer(
+                              controller: audioProvider.controller!,
+                              showVideoProgressIndicator: false,
+                            ),
+                          ),
+                        ),
                 ),
             ],
           ),
@@ -150,7 +209,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.title,
+                  audioProvider.currentTitle ?? widget.title,
                   style: GoogleFonts.roboto(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -160,7 +219,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  widget.artist,
+                  audioProvider.currentArtist ?? widget.artist,
                   style: GoogleFonts.roboto(
                     fontSize: 14,
                     color: Colors.white70,
@@ -184,16 +243,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
   Widget _buildVideoPlayer() {
     return Container(
       color: Colors.black,
-      child: audioProvider.controller != null
-          ? YoutubePlayer(
-              controller: audioProvider.controller!,
-              showVideoProgressIndicator: true,
-              progressColors: ProgressBarColors(
-                playedColor: Colors.red,
-                handleColor: Colors.redAccent,
-              ),
-            )
-          : Center(child: CircularProgressIndicator()),
+      child: YoutubePlayer(
+        controller: audioProvider.controller!,
+        showVideoProgressIndicator: true,
+        progressColors: ProgressBarColors(
+          playedColor: Colors.red,
+          handleColor: Colors.redAccent,
+        ),
+      ),
     );
   }
 
@@ -217,14 +274,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.network(
-              widget.thumbnailUrl,
+              audioProvider.currentThumbnail ?? widget.thumbnailUrl,
               fit: BoxFit.cover,
             ),
           ),
         ),
         SizedBox(height: 40),
         Text(
-          widget.title,
+          audioProvider.currentTitle ?? widget.title,
           style: GoogleFonts.roboto(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -234,7 +291,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
         ),
         SizedBox(height: 8),
         Text(
-          widget.artist,
+          audioProvider.currentArtist ?? widget.artist,
           style: GoogleFonts.roboto(
             fontSize: 18,
             color: Colors.white70,
@@ -248,14 +305,8 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
     return Container(
       padding: EdgeInsets.symmetric(vertical: 16, horizontal: 24),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(
-            icon: Icon(Icons.skip_previous, color: Colors.white, size: 36),
-            onPressed: () {
-              // Implement previous track functionality
-            },
-          ),
           IconButton(
             icon: Icon(
               _isPlaying ? Icons.pause : Icons.play_arrow,
@@ -263,12 +314,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage>
               size: 48,
             ),
             onPressed: _togglePlayPause,
-          ),
-          IconButton(
-            icon: Icon(Icons.skip_next, color: Colors.white, size: 36),
-            onPressed: () {
-              // Implement next track functionality
-            },
           ),
         ],
       ),

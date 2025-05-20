@@ -1,166 +1,94 @@
 import 'package:client/core/widgets/mini_player.dart';
 import 'package:flutter/material.dart';
+import 'package:client/features/auth/view/pages/music_player_page.dart';
+import 'package:client/services/api_service.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../../services/api_service.dart';
-import '../pages/profile_page.dart';
-import 'package:dio/dio.dart';
-import 'music_player_page.dart';
-import 'package:provider/provider.dart';
-import 'package:client/provider/audio_provider.dart';
+import 'package:client/features/auth/view/pages/profile_page.dart';
+import 'package:client/features/auth/view/pages/settings_page.dart';
 
 class HomePage extends StatefulWidget {
+  const HomePage({Key? key}) : super(key: key);
+
   @override
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> videos = [];
-  List<String> recentSearches = [];
+class _HomePageState extends State<HomePage> {
+  final ApiService _apiService = ApiService();
   bool isLoading = false;
   bool isSearching = false;
-  int _selectedIndex = 0;
-  late TabController _tabController;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final User? currentUser = FirebaseAuth.instance.currentUser;
-  final ApiService _apiService = ApiService();
-
+  List<Map<String, dynamic>> videos = [];
   List<Map<String, dynamic>> quickPicks = [];
   List<Map<String, dynamic>> recentlyPlayed = [];
   List<Map<String, dynamic>> recommendations = [];
+  TextEditingController searchController = TextEditingController();
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _loadInitialData();
+  }
 
-    // small delay to ensure the widget is fully mounted
-    Future.delayed(Duration.zero, () {
-      _loadInitialContent();
-      _loadRecentSearches();
+  Future<void> _loadInitialData() async {
+    setState(() {
+      isLoading = true;
     });
-  }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadRecentSearches() async {
-    if (currentUser != null) {
-      try {
-        final querySnapshot = await _firestore
-            .collection('users')
-            .doc(currentUser!.uid)
-            .collection('searches')
-            .orderBy('timestamp', descending: true)
-            .limit(5)
-            .get();
-
-        if (mounted) {
-          setState(() {
-            recentSearches = querySnapshot.docs
-                .map((doc) => doc['query'] as String)
-                .toList();
-          });
-        }
-      } catch (e) {
-        print('Error getting recent searches: $e');
-      }
-    }
-  }
-
-  Future<void> _saveRecentSearch(String query) async {
-    if (currentUser != null) {
-      try {
-        await _firestore
-            .collection('users')
-            .doc(currentUser!.uid)
-            .collection('searches')
-            .add({
-          'query': query,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        // Refresh recent searches
-        _loadRecentSearches();
-      } catch (e) {
-        print('Error saving search: $e');
-      }
-    }
-  }
-
-  void _loadInitialContent() async {
-    setState(() => isLoading = true);
     try {
-      quickPicks = await _apiService.getQuickPicks();
-      recentlyPlayed = await _apiService.getRecentPlayed();
-      recommendations = await _apiService.getRecommendations();
-    } catch (e) {
-      print('Error loading initial content: $e');
-    } finally {
-      setState(() => isLoading = false);
-    }
-  }
+      // Load quick picks
+      final quickPicksData = await _apiService.getQuickPicks();
+      // Load recently played
+      final recentlyPlayedData = await _apiService.getRecentPlayed();
+      // Load recommendations
+      final recommendationsData = await _apiService.getRecommendations();
 
-  Future<void> searchVideos(String query) async {
-    if (mounted) {
       setState(() {
-        isLoading = true;
-        isSearching = true;
+        quickPicks = quickPicksData;
+        recentlyPlayed = recentlyPlayedData;
+        recommendations = recommendationsData;
+        isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading initial data: $e');
+      setState(() {
+        isLoading = false;
       });
     }
+  }
+
+  Future<void> _searchVideos(String query) async {
+    if (query.isEmpty) return;
+
+    setState(() {
+      isLoading = true;
+      isSearching = true;
+    });
 
     try {
-      // API service to search YouTube
-      final Map<String, dynamic> response =
-          await _apiService.searchYouTube(query);
-
-      if (mounted) {
-        setState(() {
-          videos = List<Map<String, dynamic>>.from(response['items']);
-          isLoading = false;
-        });
-      }
-    } on DioException catch (backendError) {
-      print(
-          'Backend API error, falling back to direct YouTube API: $backendError');
-      // Fallback implementation would go here
+      final searchResults = await _apiService.searchYouTube(query);
+      setState(() {
+        videos = List<Map<String, dynamic>>.from(searchResults['items']);
+        isLoading = false;
+      });
     } catch (e) {
-      print('Error fetching videos: $e');
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-
-        // Show error
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load videos. Please try again.'),
-            backgroundColor: Colors.red[700],
-          ),
-        );
-      }
+      print('Error searching videos: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
   void clearSearch() {
     setState(() {
       isSearching = false;
-      videos.clear();
-      _searchController.clear();
+      videos = [];
+      searchController.clear();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final audioProvider = Provider.of<AudioProvider>(context, listen: false);
-
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -175,8 +103,11 @@ class _HomePageState extends State<HomePage>
             children: [
               _buildAppBar(),
               Expanded(
-                child:
-                    isSearching ? _buildSearchResults() : _buildHomeContent(),
+                child: _currentIndex == 0
+                    ? (isSearching
+                        ? _buildSearchResults()
+                        : _buildHomeContent())
+                    : ProfilePage(),
               ),
               MiniPlayer(), // Mini player at the bottom
             ],
@@ -189,138 +120,73 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildAppBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Row(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
         children: [
-          CircleAvatar(
-            backgroundColor: Colors.white24,
-            child: Icon(Icons.music_note, color: Colors.white),
-          ),
-          SizedBox(width: 12),
-          Text(
-            'Zymphony',
-            style: GoogleFonts.roboto(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          Spacer(),
-          IconButton(
-            icon: Icon(Icons.cast, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              _showSearchModal(context);
-            },
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ProfilePage()),
-              );
-            },
-            child: CircleAvatar(
-              radius: 14,
-              backgroundColor: Colors.white24,
-              child: Text(
-                currentUser?.displayName?.isNotEmpty == true
-                    ? currentUser!.displayName![0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  color: Colors.white,
+          Row(
+            children: [
+              Text(
+                'Zymphony',
+                style: GoogleFonts.roboto(
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-            ),
+              Spacer(),
+              IconButton(
+                icon: Icon(Icons.settings, color: Colors.white),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => SettingsPage()),
+                  );
+                },
+              ),
+            ],
           ),
+          if (_currentIndex == 0) ...[
+            SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: TextField(
+                controller: searchController,
+                style: TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search for music...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  prefixIcon: Icon(Icons.search, color: Colors.white70),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(vertical: 15),
+                ),
+                onSubmitted: _searchVideos,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildHomeContent() {
-    return isLoading
-        ? Center(child: CircularProgressIndicator(color: Colors.white))
-        : SingleChildScrollView(
-            physics: BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSection('Quick Picks', quickPicks),
-                _buildSection('Recently Played', recentlyPlayed),
-                _buildSection('Recommended for you', recommendations),
-                SizedBox(height: 20),
-              ],
-            ),
-          );
-  }
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator(color: Colors.white));
+    }
 
-  Widget _buildSearchResults() {
-    return isLoading
-        ? Center(child: CircularProgressIndicator(color: Colors.white))
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Search Results',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.clear, color: Colors.white),
-                      onPressed: clearSearch,
-                    ),
-                  ],
-                ),
-              ),
-              // Instead of Expanded, use Flexible or give ListView a bounded height
-              Expanded(
-                child: ListView.builder(
-                  itemCount: videos.length,
-                  itemBuilder: (context, index) {
-                    final video = videos[index];
-                    return ListTile(
-                      leading: Image.network(
-                        video['snippet']['thumbnails']['default']['url'],
-                        width: 120,
-                        height: 90,
-                        fit: BoxFit.cover,
-                      ),
-                      title: Text(
-                        video['snippet']['title'],
-                        style: TextStyle(color: Colors.white),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        video['snippet']['channelTitle'],
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                      onTap: () => _playVideo(
-                        video['id']['videoId'],
-                        video['snippet']['title'],
-                        video['snippet']['channelTitle'],
-                        video['snippet']['thumbnails']['high']['url'],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          );
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (recentlyPlayed.isNotEmpty)
+            _buildSection('Recently Played', recentlyPlayed),
+          _buildSection('Quick Picks', quickPicks),
+          _buildSection('Recommended for You', recommendations),
+        ],
+      ),
+    );
   }
 
   Widget _buildSection(String title, List<Map<String, dynamic>> items) {
@@ -348,10 +214,11 @@ class _HomePageState extends State<HomePage>
               final video = items[index];
               return GestureDetector(
                 onTap: () => _playVideo(
-                    video['id']['videoId'],
-                    video['snippet']['title'],
-                    video['snippet']['channelTitle'],
-                    video['snippet']['thumbnails']['high']['url']),
+                  video['id']['videoId'],
+                  video['snippet']['title'],
+                  video['snippet']['channelTitle'],
+                  video['snippet']['thumbnails']['high']['url'],
+                ),
                 child: Container(
                   width: 160,
                   margin: EdgeInsets.symmetric(horizontal: 4),
@@ -397,6 +264,95 @@ class _HomePageState extends State<HomePage>
     );
   }
 
+  Widget _buildSearchResults() {
+    return isLoading
+        ? Center(child: CircularProgressIndicator(color: Colors.white))
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Search Results',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.clear, color: Colors.white),
+                      onPressed: clearSearch,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: videos.length,
+                  itemBuilder: (context, index) {
+                    final video = videos[index];
+                    return ListTile(
+                      leading: Image.network(
+                        video['snippet']['thumbnails']['default']['url'],
+                        width: 120,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                      title: Text(
+                        video['snippet']['title'],
+                        style: TextStyle(color: Colors.white),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        video['snippet']['channelTitle'],
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      onTap: () => _playVideo(
+                        video['id']['videoId'],
+                        video['snippet']['title'],
+                        video['snippet']['channelTitle'],
+                        video['snippet']['thumbnails']['high']['url'],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      backgroundColor: Colors.black,
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Colors.grey,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+    );
+  }
+
+  // Method to play a video
   void _playVideo(
       String videoId, String title, String channelTitle, String thumbnailUrl) {
     final song = {
@@ -410,6 +366,7 @@ class _HomePageState extends State<HomePage>
       }
     };
     _apiService.addToRecentlyPlayed(song);
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => MusicPlayerPage(
@@ -419,153 +376,6 @@ class _HomePageState extends State<HomePage>
           thumbnailUrl: thumbnailUrl,
         ),
       ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFFFF0000).withOpacity(0.9), // Bright red
-            Color(0xFFFFD700).withOpacity(0.9), // Gold/yellow
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-      ),
-      child: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-            _tabController.animateTo(index);
-          });
-        },
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_music),
-            label: 'Library',
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSearchModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.9,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFF0000), Color(0xFFFFD700)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  style: TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search for music',
-                    hintStyle: TextStyle(color: Colors.white70),
-                    prefixIcon: Icon(Icons.search, color: Colors.white),
-                    suffixIcon: IconButton(
-                      icon: Icon(Icons.clear, color: Colors.white),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    ),
-                    filled: true,
-                    fillColor: Colors.white24,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      searchVideos(value);
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    if (recentSearches.isNotEmpty) ...[
-                      _buildSearchCategory('Recent searches'),
-                      ...recentSearches.map((query) => _buildSearchItem(query)),
-                    ],
-                    _buildSearchCategory('Trending searches'),
-                    _buildSearchItem('Taylor Swift'),
-                    _buildSearchItem('Drake'),
-                    _buildSearchItem('Billie Eilish'),
-                    _buildSearchItem('Bad Bunny'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildSearchCategory(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchItem(String query) {
-    return ListTile(
-      leading: Icon(Icons.history, color: Colors.white70),
-      title: Text(
-        query,
-        style: TextStyle(color: Colors.white),
-      ),
-      onTap: () {
-        _searchController.text = query;
-        searchVideos(query);
-        Navigator.pop(context);
-      },
     );
   }
 }
