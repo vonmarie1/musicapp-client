@@ -17,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _resetEmailController = TextEditingController();
 
   bool _isLoading = false;
   bool _isSignUp = false;
@@ -27,6 +28,7 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _nameController.dispose();
+    _resetEmailController.dispose();
     super.dispose();
   }
 
@@ -92,6 +94,65 @@ class _LoginPageState extends State<LoginPage> {
         });
       }
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    // Pre-fill with email if it's already entered in the login form
+    _resetEmailController.text = _emailController.text.trim();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Enter your email address and we\'ll send you a link to reset your password.',
+              style: TextStyle(fontSize: 14),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _resetEmailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.email),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = _resetEmailController.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Please enter your email')),
+                );
+                return;
+              }
+
+              Navigator.of(context).pop(); // Close dialog
+
+              try {
+                final authService =
+                    Provider.of<AuthService>(context, listen: false);
+                await authService.sendPasswordResetEmail(email, context);
+              } catch (e) {
+                // Error is already shown via snackbar in the auth service
+              }
+            },
+            child: Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -238,6 +299,21 @@ class _LoginPageState extends State<LoginPage> {
                         },
                       ),
                       SizedBox(height: 16),
+                    ],
+                    if (!_isSignUp) ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _showForgotPasswordDialog,
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                     SizedBox(height: 8),
                     ElevatedButton(

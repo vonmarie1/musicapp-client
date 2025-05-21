@@ -1,16 +1,24 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   User? _user;
   bool _isLoading = false;
+  Timer? _emailVerificationTimer;
 
   AuthService() {
     _auth.authStateChanges().listen((User? user) {
       _user = user;
+
+      // If user exists and email is not verified, start verification check
+      if (user != null && !user.emailVerified) {
+        _startEmailVerificationCheck();
+      }
+
       notifyListeners();
     });
   }
@@ -18,6 +26,7 @@ class AuthService extends ChangeNotifier {
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
+  bool get isEmailVerified => _user?.emailVerified ?? false;
 
   // Sign up with email and password
   Future<UserCredential> signUp(
@@ -46,6 +55,10 @@ class AuthService extends ChangeNotifier {
 
       // Send verification email
       await userCredential.user?.sendEmailVerification();
+
+      // Start checking for email verification
+      _startEmailVerificationCheck();
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text('Verification email sent. Please check your inbox.')),
@@ -65,7 +78,7 @@ class AuthService extends ChangeNotifier {
   }
 
   // Sign in with email and password
-  Future<UserCredential> signIn(
+  Future<UserCredential?> signIn(
       String email, String password, BuildContext context) async {
     try {
       _isLoading = true;
@@ -74,14 +87,19 @@ class AuthService extends ChangeNotifier {
       UserCredential userCredential = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
 
-      await _user?.reload();
-      if (_user != null && !_user!.emailVerified) {
-        await _auth.signOut();
+      // Check if email is verified
+      await userCredential.user?.reload();
+      User? updatedUser = _auth.currentUser;
+
+      if (updatedUser != null && !updatedUser.emailVerified) {
+        // If email is not verified, start checking for verification
+        _startEmailVerificationCheck();
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Email not verified. Please check your inbox.')),
+              content: Text(
+                  'Please verify your email to continue. Check your inbox.')),
         );
-        throw Exception('Email not verified');
       }
 
       _isLoading = false;
@@ -97,55 +115,56 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Check if email is verified
+  // Start checking for email verification
+  void _startEmailVerificationCheck() {
+    // Cancel any existing timer
+    _emailVerificationTimer?.cancel();
+
+    // Check every 5 seconds if the email has been verified
+    _emailVerificationTimer =
+        Timer.periodic(Duration(seconds: 5), (timer) async {
+      // Reload user to get latest email verification status
+      await _user?.reload();
+      _user = _auth.currentUser;
+
+      if (_user != null && _user!.emailVerified) {
+        // Email is verified, stop checking
+        timer.cancel();
+        _emailVerificationTimer = null;
+
+        // Notify listeners that email is verified
+        notifyListeners();
+      }
+    });
+  }
+
+  // Manually check if email is verified
   Future<bool> checkEmailVerified() async {
-    await _user?.reload();
+    if (_user == null) return false;
+
+    await _user!.reload();
     _user = _auth.currentUser;
     notifyListeners();
     return _user?.emailVerified ?? false;
   }
 
   // Send verification email
-  Future<void> sendVerificationEmail() async {
+  Future<void> sendVerificationEmail(BuildContext context) async {
     if (_user != null && !_user!.emailVerified) {
-      await _user!.sendEmailVerification();
-    }
-  }
-
-  // Update user profile
-  Future<void> updateProfile({
-    required String displayName,
-    String? photoURL,
-  }) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-
-      if (_user != null) {
-        // Update Firebase Auth profile
-        await _user!.updateDisplayName(displayName);
-        if (photoURL != null) {
-          await _user!.updatePhotoURL(photoURL);
-        }
-
-        // Update Firestore document
-        await _firestore.collection('users').doc(_user!.uid).update({
-          'name': displayName,
-          if (photoURL != null) 'photoURL': photoURL,
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        // Refresh user data
-        await _user!.reload();
-        _user = _auth.currentUser;
+      try {
+        await _user!.sendEmailVerification();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Verification email sent. Please check your inbox.')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Error sending verification email: ${e.toString()}')),
+        );
       }
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
     }
   }
 
@@ -215,6 +234,10 @@ class AuthService extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
+      // Cancel email verification timer if active
+      _emailVerificationTimer?.cancel();
+      _emailVerificationTimer = null;
+
       await _auth.signOut();
 
       _isLoading = false;
@@ -224,5 +247,38 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  // Send password reset email
+  Future<void> sendPasswordResetEmail(
+      String email, BuildContext context) async {
+    try {
+      _isLoading = true;
+      notifyListeners();
+
+      await _auth.sendPasswordResetEmail(email: email);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $email')),
+      );
+
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text('Error sending password reset email: ${e.toString()}')),
+      );
+      rethrow;
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailVerificationTimer?.cancel();
+    super.dispose();
   }
 }
